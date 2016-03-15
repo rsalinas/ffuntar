@@ -46,6 +46,10 @@ public:
             throw LibarchiveException("archive_read_open_filename()", a);
     }
 
+    void setStripLevel(int n) {
+        m_stripLevels = n;
+    }
+
     int extract(bool do_extract) {
         for (;;) {
             struct archive_entry *entry;
@@ -197,6 +201,16 @@ public:
         return 0;
     }
 
+    QString stripFile(const QString &fn) {
+        QString ret = fn;
+        for (int i = 0; i < m_stripLevels; ++i) {
+             ret = ret.replace(QRegExp(".*/"), "");
+        }
+        if (m_stripLevels && verbose)
+            qDebug() << fn << "->" << ret;
+        return ret;
+    }
+
     int extract(struct archive_entry *entry)
     {
         // FIXME: Clean this very quick and dirty implementation
@@ -211,7 +225,7 @@ public:
             return normalCopy(entry);
         }
         char buffer[65536];
-        QString other = otherDir.absoluteFilePath(fn);
+        QString other = otherDir.absoluteFilePath(stripFile(fn));
 
         // Try to open the reference file;
         int refFd = open(other.toStdString().c_str(), O_RDONLY);
@@ -313,6 +327,7 @@ private:
     struct archive *a = archive_read_new();
     struct archive *ext = archive_write_disk_new();
     const QDir otherDir;
+    int m_stripLevels = 0;
 
     size_t linkedFiles = 0;
     size_t savedWriteBytes = 0;
@@ -357,6 +372,11 @@ main(int argc, char **argv)
                                          QCoreApplication::translate("main", "filename"));
     parser.addOption(archiveNameOption);
 
+    QCommandLineOption stripPrefixOption(QStringList() << "s" << "strip-prefix",
+                                         QCoreApplication::translate("main", "Strips the given amount of prefix directories."),
+                                         QCoreApplication::translate("main", "levels"));
+    parser.addOption(stripPrefixOption);
+
     // Process the actual command line arguments given by the user
     parser.process(app);
 
@@ -376,6 +396,7 @@ main(int argc, char **argv)
     try {
         Ffuntar ffu(filename.size() ? filename.toStdString().c_str() : nullptr,
                     flags, showProgress, parser.value(referenceDirOption));
+        ffu.setStripLevel(parser.value(stripPrefixOption).toInt());
         int ret = ffu.extract(! parser.isSet(listOption));
         ffu.showStats();
         return ret;
