@@ -11,6 +11,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <fcntl.h>
+#include <cassert>
 #include <QDir>
 
 #include <QCommandLineParser>
@@ -106,8 +107,9 @@ public:
     };
 
     int copyAll(int from, int to, size_t sz) {
+        assert(sz > 0 );
         size_t pending = sz;
-        char buffer[sz];
+        char buffer[65536];
         while (pending > 0) {
             int x = read(from, buffer, std::min(sizeof(buffer), pending)) ;
             if (x<0) {
@@ -143,7 +145,8 @@ public:
             return -1;
         }
         FdGuard fdnewg(fdnew);
-        copyAll(refFd, fdnew, equalBytes);
+        if (equalBytes)
+            copyAll(refFd, fdnew, equalBytes);
 
         //Write the current buffer
         if (write(fdnew, buffer, bytesCurrentBuffer) != bytesCurrentBuffer) {
@@ -204,7 +207,8 @@ public:
     QString stripFile(const QString &fn) {
         QString ret = fn;
         for (int i = 0; i < m_stripLevels; ++i) {
-             ret = ret.replace(QRegExp(".*/"), "");
+            static const QRegExp re("^[^/]*/");
+            ret = ret.replace(re, "");
         }
         if (m_stripLevels && verbose)
             qDebug() << fn << "->" << ret;
@@ -255,7 +259,7 @@ public:
                 qWarning() << "error reading" << archive_error_string(ext);
                 return -1;
             }
-            char referenceBuffer[n];
+            char referenceBuffer[sizeof(buffer)];
             int m = read(refFd, referenceBuffer, n);
             if (m < n || memcmp(buffer, referenceBuffer, m)) {
                 //reference differs
