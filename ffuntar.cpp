@@ -381,6 +381,12 @@ main(int argc, char **argv)
                                          QCoreApplication::translate("main", "levels"));
     parser.addOption(stripPrefixOption);
 
+    QCommandLineOption chdirOption(QStringList() << "C" << "chdir",
+                                         QCoreApplication::translate("main", "Changes to the given directory."),
+                                         QCoreApplication::translate("main", "directory"));
+    parser.addOption(chdirOption);
+
+
     // Process the actual command line arguments given by the user
     parser.process(app);
 
@@ -390,6 +396,12 @@ main(int argc, char **argv)
         flags |= ARCHIVE_EXTRACT_PERM;
         flags |= ARCHIVE_EXTRACT_ACL;
         flags |= ARCHIVE_EXTRACT_FFLAGS;
+    }
+
+    if (parser.isSet(chdirOption)) {
+        if (!QDir::setCurrent(parser.value(chdirOption))) {
+            qFatal("Cannot chdir");
+        }
     }
 
     QString filename;
